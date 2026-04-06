@@ -1673,6 +1673,15 @@ impl<'s> Worker<'s> {
             true
         };
 
+        let depth = work.dent.depth();
+        let at_max_depth = self.max_depth.map_or(false, |max| depth >= max);
+        if at_max_depth {
+            if should_visit {
+                return self.visitor.visit(Ok(work.dent));
+            }
+            return WalkState::Skip;
+        }
+
         // Try to read the directory first before we transfer ownership
         // to the provided closure. Do not unwrap it immediately, though,
         // as we may receive an `Err` value e.g. in the case when we do not
@@ -1680,7 +1689,6 @@ impl<'s> Worker<'s> {
         // In that case we still want to provide the closure with a valid
         // entry before passing the error value.
         let readdir = work.read_dir();
-        let depth = work.dent.depth();
         if should_visit {
             let state = self.visitor.visit(Ok(work.dent));
             if !state.is_continue() {
@@ -1697,10 +1705,6 @@ impl<'s> Worker<'s> {
                 return self.visitor.visit(Err(err));
             }
         };
-
-        if self.max_depth.map_or(false, |max| depth >= max) {
-            return WalkState::Skip;
-        }
         for result in readdir {
             let state = self.generate_work(
                 &work.ignore,
